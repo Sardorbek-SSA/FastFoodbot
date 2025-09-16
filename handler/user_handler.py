@@ -1,221 +1,206 @@
-from aiogram.types import Message,ReplyKeyboardRemove,CallbackQuery, FSInputFile, InputMediaPhoto
-from aiogram.filters import Command, CommandStart
-from aiogram import Router, F
+from aiogram.types import Message,ReplyKeyboardRemove,CallbackQuery
+from aiogram.filters import Command,CommandStart
+from aiogram import Router,F
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import StatesGroup, State
-from collections import defaultdict
-from database import is_register, save_user, get_food_by_name
-from .buttons import register_kb, phone_kb, location_kb, main_menu, menu_kb,contact_kb,settings_kb,cart_kb,food_kb
+from aiogram.fsm.state import StatesGroup,State
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton ,FSInputFile,InputMediaPhoto
+
+
+from database.query import is_register,save_user,get_foods,get_food,save_order
+from .buttons import register_kb,phone_kb,location_kb,main_button,food_button,puls_minus_button
+from .buttons import reg_text,menu_text
+from .filters import check_phone, check_location
 
 user_router = Router()
-user_carts = defaultdict(list)
+
 
 class Register(StatesGroup):
     fullname = State()
     phone = State()
     location = State()
 
+
 @user_router.message(CommandStart())
 async def start(message:Message):
     if is_register(message.from_user.id) is None:
-        text = """
-FastFood Botga xush kelibsiz!  
+        await message.answer(text=reg_text,reply_markup=register_kb)
 
-Buyurtma berishdan oldin kichik ro'yxatdan o'tishingiz kerak.  
-Iltimos, quyidagi ma'lumotlarni kiriting:  
-👤 To'liq ismingiz  
-📱 Telefon raqamingiz  
-📍 Yetkazib berish manzilingiz  
-        
-"""
-        await message.answer(text=text,reply_markup=register_kb)
-    else:    
-        await message.answer("Siz ro'yxatdan o'tgansiz, menuga o'ting",
-                             reply_markup=main_menu)
-        
+    else:
+
+        await message.answer(menu_text,reply_markup=main_button)
+
+
 @user_router.message(F.text == "Register")
-async def register_handler(message:Message, state:FSMContext):
+async def register_handler(message:Message,state:FSMContext):
     await state.set_state(Register.fullname)
-    await message.answer("To'liq ismingiz: ",reply_markup=ReplyKeyboardRemove())
-    
+
+    await message.answer("F.I.SH kiriting: ",reply_markup=ReplyKeyboardRemove())
+
+
 @user_router.message(Register.fullname)
 async def get_fullname(message:Message,state:FSMContext):
     await state.update_data(fullname = message.text)
     await state.set_state(Register.phone)
-    await message.answer("Telefon raqamingizni yuboring:",reply_markup=phone_kb,)
+
+    await message.answer("Telfon raqam yiuboring: ",reply_markup=phone_kb)
+
+@user_router.message(Register.phone)
+async def get_phone(message:Message,state:FSMContext):
+    if message.contact or  check_phone(message.text):
+        if message.contact:
+            phone = message.contact.phone_number
+        else:
+            phone = message.text
+
+        await state.update_data(phone=phone)
+        await state.set_state(Register.location)
+        await message.answer("Location yuboring: ", reply_markup=location_kb)
+    else:
+        await message.answer("Telfon raqam noto'g'ri kiritildi.",reply_markup=phone_kb)
+
+
+
+@user_router.message(Register.location)
+async def get_loction(message:Message,state:FSMContext):
+    if message.location:
+        if check_location(message.location.latitude,message.location.longitude):
+            
+            data = await state.get_data()
+            
+            save_user(
+                message.from_user.id,
+                data["fullname"],
+                data["phone"],
+                message.location.latitude,
+                message.location.longitude,
+                message.from_user.username
+         
+            )
+            await state.clear()
+            await message.answer("Registratsiya muofaqqiyatli!!!",reply_markup=main_button)
+            
+    else:
+
+        await message.answer("Button orqali yuboring",reply_markup=location_kb)
+
+
+
+@user_router.message(F.text == "📞 Aloqa")
+async def contact_admin(message:Message):
+    text = """
+📞 Admin bilan bog‘lanish
+
+Agar savollaringiz bo‘lsa yoki buyurtma bilan bog‘liq muammo yuz bersa, biz bilan bemalol bog‘lanishingiz mumkin 👇  
+
+👨‍💼 Admin: @Azamjon_Usmonaliyev 
+☎️ Telefon: +998 91 123 66 99  
+⏰ Qabul vaqti: 09:00 – 22:00  
+
+❗ Iltimos, murojaatingizni aniq va qisqa yozing — tezroq yordam bera olamiz.
+"""
+    await message.answer(text)
+
+
+
+
+
+@user_router.message(F.text =="🍽 Menu")
+async def menu(message:Message):
+
+    await message.answer_photo(photo="https://media.istockphoto.com/id/1407832840/photo/foods-enhancing-the-risk-of-cancer-junk-food.jpg?s=612x612&w=0&k=20&c=IBXz9XVfsZS-MM-AOW1kGel3WtgIDZpewFpNO2hGTGE=",
+                               caption="""
+🍔 Xush kelibsiz, FastFood menyusiga! 😋  
+
+Bu yerda siz eng sevimli taomlaringizni topishingiz mumkin.
+
+🛒 Buyurtma berish uchun kerakli taomni tanlang va savatga qo‘shing!""",reply_markup= await food_button())
+ 
     
-@user_router.message(Register.phone, F.contact)
-async def get_phone_contact(message: Message, state: FSMContext):
-    await state.update_data(phone=message.contact.phone_number)
-    await state.set_state(Register.location)
-    await message.answer("Manzilingizni yozing:", reply_markup=location_kb)
-@user_router.message(Register.location, F.location)
-async def get_location(message: Message, state: FSMContext):
-    lat = message.location.latitude
-    lon = message.location.longitude
-    await state.update_data(lat=lat, lon=lon)
+
+@user_router.callback_query(F.data.startswith("food"))
+async def get_one_food(call:CallbackQuery):
+    id = int(call.data.split("_")[1])
+    food = get_food(id)
+    image = FSInputFile(food[2])
+    media = InputMediaPhoto(media=image,caption=f"{food[1]}")
+    await call.message.edit_media(media=media)
+    await call.message.edit_reply_markup(reply_markup=puls_minus_button(food[0],1))
+
+
+@user_router.callback_query(F.data.startswith("minus"))
+async def minus_button(call:CallbackQuery):
+    quantity = int(call.data.split("_")[1])
+    food_id = int(call.data.split("_")[2])
+    if quantity>1:
+        quantity-=1
+        await call.message.edit_reply_markup(reply_markup=puls_minus_button(food_id,quantity))
+
+    else:
+        await call.answer("Mahsulot 1 ta dan kam bo'lishi mumkin emas")
+
+
+
+@user_router.callback_query(F.data.startswith("plus"))
+async def plus_button(call:CallbackQuery):
+    quantity = int(call.data.split("_")[1])
+    food_id = int(call.data.split("_")[2])
+    if quantity < 10:
+        quantity+=1
+        await call.message.edit_reply_markup(reply_markup=puls_minus_button(food_id,quantity))
+
+    else:
+        await call.answer("Mahsulot 10 ta dan ko'p bo'lishi mumkin emas")
+
+
+@user_router.callback_query(F.data == "cancel_food")
+async def food_back(call: CallbackQuery):
+
+
+    await call.message.edit_media(media=InputMediaPhoto(media="https://media.istockphoto.com/id/1407832840/photo/foods-enhancing-the-risk-of-cancer-junk-food.jpg?s=612x612&w=0&k=20&c=IBXz9XVfsZS-MM-AOW1kGel3WtgIDZpewFpNO2hGTGE=",caption="""
+🍔 Xush kelibsiz, FastFood menyusiga! 😋  
+
+Bu yerda siz eng sevimli taomlaringizni topishingiz mumkin.
+
+🛒 Buyurtma berish uchun kerakli taomni tanlang va savatga qo‘shing!"""),
+                               )
+    await call.message.edit_reply_markup(reply_markup=await food_button())
+
+
+
+@user_router.callback_query(F.data.startswith("next_food"))
+async def admit_food(call:CallbackQuery):
+    food_id = int(call.data.split("_")[-1])
+    quantity = int(call.data.split("_")[-2])
+
+    food = get_food(food_id)
+    confirm_text = (
+    f"🍽 Taom: {food[1]}\n"
+    f"💵 Narxi: {food[3]:,} so'm\n"
+    f"📦 Soni: {quantity} ta\n\n"
+    f"💵 Umumiy: {int(food[3])*quantity} so'm\n"
+    f"Siz ushbu buyurtmani tasdiqlaysizmi?"
+)
     
-    
-    data = await state.get_data()
-    fullname = data["fullname"]
-    phone = data["phone"]
-    
-    save_user(
-        user_id=message.from_user.id,
-        fullname=fullname,
-        phone=phone,
-        lat=lat,
-        lon=lon
-    )
-    
-    await message.answer(
-        f"✅ Ro'yxatdan o'tish yakunlandi!\n\n"
-        f"👤 Ism: {fullname}\n"
-        f"📱 Telefon: {phone}\n"
-        f"📍 Manzil: {lat},{lon}\n\n"
-        "Endi buyurtma berishingiz mumkin!",
-        reply_markup=main_menu
-    )
-    await state.clear()
-    
-@user_router.message(F.text == "📖 Menu")
-async def show_menu(message: Message):
-    photo = FSInputFile("main.jpg")
-    
-    await message.answer_photo(
-        photo=photo,
-        caption="🍽 Menudan tanlang:",
-        reply_markup=menu_kb
-    )
+    order_button = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [InlineKeyboardButton(text="Cancel",callback_data="cancel_food"),InlineKeyboardButton(text="Send",callback_data=f"Send_{food_id}_{quantity}_{food[3]}")]
+    ]
+)
+   
+    await call.message.edit_caption(caption=confirm_text)
+    await call.message.edit_reply_markup(reply_markup=order_button)
 
-@user_router.callback_query(F.data.startswith("food_"))
-async def food_callback(callback: CallbackQuery):
-    food_name = callback.data.split("_", 1)[1]
-    food = get_food_by_name(food_name)
-    
-    if not food:
-        await callback.answer("❌ Bu mahsulot topilmadi!", show_alert=True)
-        return
 
-    _, name, image, price, quantity = food
+@user_router.callback_query(F.data.startswith("Send"))
+async def order_save(call:CallbackQuery):
+    food_id = int(call.data.split("_")[1])
+    quantity = int(call.data.split("_")[2])
+    price = int(call.data.split("_")[-1])
 
-    image_path = f"images/{image}"
+    user_id =int(is_register(call.from_user.id)[0])
+  
+    save_order(food_id,user_id,quantity,price)
 
-    new_media = InputMediaPhoto(
-        media=FSInputFile(image_path),
-        caption=f"🍽 {name}\n💰 Narx: {price} so'm\n📦 Qolgan: {quantity}"
-    )
+    await call.message.edit_reply_markup(reply_markup=None)
 
-    await callback.message.edit_media(
-        media=new_media,
-        reply_markup=food_kb(name, 1)
-    )
-
-    await callback.answer()
-    
-@user_router.callback_query(F.data.startswith("qty_"))
-async def update_quantity(callback: CallbackQuery):
-    _, action, name, qty = callback.data.split("_")
-    qty = int(qty)
-
-    if action == "plus":
-        qty += 1
-    elif action == "minus" and qty > 1:
-        qty -= 1
-
-    food = get_food_by_name(name)
-    if not food:
-        await callback.answer("❌ Mahsulot topilmadi!", show_alert=True)
-        return
-
-    _, name, image, price, quantity = food
-
-    image_path = f"images/{image}"
-
-    new_media = InputMediaPhoto(
-        media=FSInputFile(image_path),
-        caption=f"🍔 {name}\n💰 Narx: {price} so'm\n📦 Qolgan: {quantity}\n📌 Tanlangan: {qty} ta"
-    )
-
-    await callback.message.edit_media(
-        media=new_media,
-        reply_markup=food_kb(name, qty)
-    )
-
-    await callback.answer()
-
-@user_router.callback_query(F.data.startswith("checkout_"))
-async def checkout_callback(callback: CallbackQuery):
-    _, name, qty = callback.data.split("_")
-    qty = int(qty)
-
-    food = get_food_by_name(name)
-    if not food:
-        await callback.answer("❌ Mahsulot topilmadi!", show_alert=True)
-        return
-
-    _, name, image, price, quantity = food  
-
-    add_to_cart(callback.from_user.id, name, qty, price)
-
-    await callback.answer("✅ Savatga qo'shildi!", show_alert=True)
-
-    await callback.message.edit_reply_markup(
-        reply_markup=cart_kb
-    )
-
-@user_router.message(lambda message: message.text == "🛒 Savatcha")
-async def cart(message: Message):
-    cart = get_cart(message.from_user.id)
-    if not cart:
-        await message.answer(
-            "🛒 Sizning savatchangiz hozircha bo'sh.\n\n"
-            "📖 Menyudan mahsulot tanlab, buyurtmangizni qo'shishingiz mumkin.",
-            reply_markup=main_menu
-        )
-        return
-    
-    text = "🛒 Sizning savatingiz:\n\n"
-    total = 0
-    for name, qty, price in cart:
-        text += f"🍔 {name} x{qty} = {price * qty} so'm\n"
-        total += price * qty
-    text += f"\n💰 Umumiy summa: {total} so'm"
-
-    await message.answer(text, reply_markup=menu_kb)
-
-def add_to_cart(user_id: int, name: str, qty: int, price: int):
-    for i, (n, q, p) in enumerate(user_carts[user_id]):
-        if n == name:
-            user_carts[user_id][i] = (n, q + qty, p)
-            return
-    user_carts[user_id].append((name, qty, price))
-def get_cart(user_id: int):
-    return user_carts[user_id]
-def clear_cart(user_id: int):
-    user_carts[user_id].clear()
-@user_router.message(lambda message: message.text == "🛒 Savatcha")
-async def cart(message: Message):
-    await message.answer(
-        "🛒 Sizning savatchangiz hozircha bo'sh.\n\n"
-        "📖 Menyudan mahsulot tanlab, buyurtmangizni qo'shishingiz mumkin.",
-        reply_markup=main_menu
-    )
-@user_router.message(lambda message: message.text == "📞 Contact us")
-async def contact_us(message: Message):
-    await message.answer(
-        "📞 Biz bilan bog'lanish uchun:\n\n"
-        "☎️ Telefon: +998 88 033 73 33\n"
-        "📧 Email: sardorbekabdurakhmonov52@gmail.uz\n"
-        "🌐 Telegram: @d1re_wolf",
-        reply_markup=main_menu
-    )
-@user_router.message(lambda message: message.text == "⚙️ Sozlamalar")
-async def settings(message: Message):
-    await message.answer(
-        "⚙️ Sozlamalar bo'limi.\nIltimos, kerakli amalni tanlang:",
-        reply_markup=settings_kb
-    )
-@user_router.message(lambda message: message.text == "⬅️ Orqaga")
-async def back_to_menu(message: Message):
-    await message.answer("🏠 Asosiy menyu", reply_markup=main_menu)
+    await call.message.answer("Success",reply_markup=main_button)

@@ -1,13 +1,15 @@
-from aiogram import Bot, Dispatcher, F
+from aiogram import Bot,Dispatcher
 from environs import Env
-import asyncio 
+import asyncio
 import logging
-from handler import admin_router, user_router
+
+from handler import admin_router,user_router
 
 dp = Dispatcher()
 
-env = Env()
+env  = Env()
 env.read_env()
+
 
 async def main():
     TOKEN = env.str("TOKEN")
@@ -16,9 +18,11 @@ async def main():
     dp.include_router(user_router)
     await dp.start_polling(bot)
 
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
+
     try:
         asyncio.run(main())
-    except Exception as e:
-        print(e)
+    except Exception as err:
+        print(err)
