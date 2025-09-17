@@ -92,8 +92,8 @@ async def contact_admin(message:Message):
 
 Agar savollaringiz bo‘lsa yoki buyurtma bilan bog‘liq muammo yuz bersa, biz bilan bemalol bog‘lanishingiz mumkin 👇  
 
-👨‍💼 Admin: @Azamjon_Usmonaliyev 
-☎️ Telefon: +998 91 123 66 99  
+👨‍💼 Admin: @d1re_wolf
+☎️ Telefon: +998 88 033 73 33
 ⏰ Qabul vaqti: 09:00 – 22:00  
 
 ❗ Iltimos, murojaatingizni aniq va qisqa yozing — tezroq yordam bera olamiz.
@@ -204,3 +204,4 @@ async def order_save(call:CallbackQuery):
     await call.message.edit_reply_markup(reply_markup=None)
 
     await call.message.answer("Success",reply_markup=main_button)
+
