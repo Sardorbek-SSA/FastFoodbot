@@ -92,7 +92,7 @@ def update_food(food_id):
     
 
 admin_munu_text = """
-✅ Siz muvaffaqiyatli Admin panelga kirdingiz!
+✅ Siz Admin panelga kirdingiz!
 Bu bo‘lim orqali siz quyidagi amallarni bajarishingiz mumkin:
 
 🍔 Yangi taom qo‘shish
