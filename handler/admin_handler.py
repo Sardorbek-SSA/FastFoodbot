@@ -19,20 +19,14 @@ admin_router = Router()
 
 
 @admin_router.message(Command("admin"))
-async def start_admin(message:Message):
+async def start_admin(message: Message):
     chat_id = message.from_user.id
-
     user = is_admin(chat_id)
 
-    if user:
-        if user[-1]:
-           
-           await message.answer(text=admin_munu_text,reply_markup=admin_menu)
-        else:
-            await message.answer("Siz admin emassiz!!! 🙃")
+    if user: 
+        await message.answer(text=admin_munu_text, reply_markup=admin_menu)
     else:
-
-        await message.answer("Siz Ro'yhatdan o'tmagansiz, Ro'yhatdan o'ting: ",reply_markup=register_kb)
+        await message.answer("Siz admin emassiz")
 
 
 @admin_router.message(F.text =="🧾 Buyurtmalar")
@@ -59,7 +53,7 @@ async def new_order(message:Message):
 
 
 
-@admin_router.message(F.text =="⏳ In Progress")
+@admin_router.message(F.text =="⏳ In progress")
 async def progress_order(message:Message):
     foods = is_progress_foods()
 
@@ -74,18 +68,37 @@ async def progress_order(message:Message):
                      reply_markup=progress_order_food(i[0])
             )
 
+@admin_router.callback_query(F.data.startswith("progress_finish"))
+async def progress_finish(call: CallbackQuery):
+    order_id = int(call.data.split("_")[-1])
+    update_order(order_id, "finished")
+    await call.message.edit_reply_markup(reply_markup=None)
+    await call.message.edit_text("Buyurtma yakunlandi ✅")
+
+@admin_router.callback_query(F.data.startswith("progress_cancel"))
+async def progress_cancel(call: CallbackQuery):
+    order_id = int(call.data.split("_")[-1])
+    update_order(order_id, "cancel")
+    await call.message.edit_reply_markup(reply_markup=None)
+    await call.message.edit_text("Buyurtma bekor qilindi ✅")
 
 @admin_router.callback_query(F.data.startswith("new_cancel"))
 async def cancel_order(call:CallbackQuery):
     order_id = int(call.data.split("_")[-1])
     update_order(order_id)
   
-    
-
     await call.message.edit_reply_markup(reply_markup=None)
-    await call.message.edit_text(text="success")
+    await call.message.edit_text(text="Cancelled")
 
-
+@admin_router.callback_query(F.data.startswith("new_in_progress_"))
+async def in_progress_order(call: CallbackQuery):
+    order_id = int(call.data.split("_")[-1])
+    try:
+        update_order(order_id, status='In progress') 
+        await call.message.edit_reply_markup(reply_markup=None)
+        await call.message.edit_text("⌛ In progress")
+    except Exception as e:
+        await call.message.answer(f"Xatolik yuz berdi: {e}")
 
 @admin_router.message(F.text=="🍱 Taomlar")
 async def menu_foods(message:Message,state:FSMContext):
@@ -186,5 +199,3 @@ async def  update_food_start(message:Message):
     
     for i in get_foods():
         await message.answer(text=str(i[1]),reply_markup=update_food(i[0]))
-
-

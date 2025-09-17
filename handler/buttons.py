@@ -28,6 +28,16 @@ location_kb = ReplyKeyboardMarkup(
     one_time_keyboard=True
 )
 
+settings_button = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="📝 Ismni o'zgartirish")],
+        [KeyboardButton(text="📞 Telefon raqamini o'zgartirish")],
+        [KeyboardButton(text="📍 Manzilni o'zgartirish")],
+        [KeyboardButton(text="🔙 Orqaga")],
+    ],
+    resize_keyboard=True
+)
+
 main_button = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="🍽 Menu"), KeyboardButton(text="🛒 Buyurtmalar")],
@@ -36,8 +46,6 @@ main_button = ReplyKeyboardMarkup(
     resize_keyboard=True,
     one_time_keyboard=True
 )
-
-
 
 def puls_minus_button(food_id, quantity=1):
 
@@ -48,8 +56,6 @@ def puls_minus_button(food_id, quantity=1):
              InlineKeyboardButton(text="➕",callback_data=f"plus_{quantity}_{food_id}")],
              [InlineKeyboardButton(text="↩️",callback_data="cancel_food"),
                 InlineKeyboardButton(text="⏩",callback_data=f"next_food_{quantity}_{food_id}")]
-
-            
         ]
     )
     return buttons

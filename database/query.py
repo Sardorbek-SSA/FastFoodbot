@@ -1,4 +1,5 @@
 from .connect import get_connect
+from config import ADMINS
 
 conn = get_connect()
 conn.autocommit = True
@@ -13,7 +14,6 @@ def is_register(chat_id):
             except:
                 return None
         
-
 def save_user(chat_id,fullname,phone,lat,long,username=None):
     with  conn as db:
         with db.cursor() as dbc:
@@ -26,8 +26,6 @@ def save_user(chat_id,fullname,phone,lat,long,username=None):
 
                 return None
             
-        
-
 def get_foods():
     with conn as db:
         with db.cursor() as dbc:
@@ -37,14 +35,12 @@ def get_foods():
 
     return foods
 
-
 def get_food(id):
     with conn as db:
         with db.cursor() as dbc:
             dbc.execute("select * from food where id =%s",(id,))
             foods = dbc.fetchone()
     return foods
-
 
 def save_order(food_id,user_id,quantity,price):
 
@@ -55,22 +51,8 @@ def save_order(food_id,user_id,quantity,price):
         Insert into orders (food_id,user_id,quantity,price,status) values(%s,%s,%s,%s,%s)
     """,(food_id,user_id,quantity,price,"new"))
             
-
 def is_admin(chat_id):
-
-    try:
-
-        with conn as db:
-            with db.cursor() as dbc:
-
-                dbc.execute("select * from users where chat_id = %s",(chat_id,))
-                data = dbc.fetchone()
-                
-        return data
-
-    except:
-        return None
-    
+    return chat_id == ADMINS
 
 def is_new_foods():
     try:
@@ -100,8 +82,6 @@ WHERE o.status = 'new';
     except:
         return None
 
-
-
 def is_progress_foods():
     try:
 
@@ -130,17 +110,15 @@ WHERE o.status = 'in_progress';
     except:
         return None
 
-
-
-def update_order(order_id):
+def update_order(order_id, status='Cancelled'):
     try:
-
         with conn as db:
             with db.cursor() as dbc:
-                dbc.execute("update orders set status = 'cancel' where id = %s",(order_id,))
-                
+                dbc.execute(
+                    "UPDATE orders SET status = %s WHERE id = %s",
+                    (status, order_id)
+                )
         return True
-
     except:
         return None
     
@@ -155,4 +133,24 @@ def add_food(data:dict):
 
     except:
         return None
-
+    
+def get_user_orders(user_id):
+    try:
+        with conn as db:
+            with db.cursor() as dbc:
+                dbc.execute("""
+                    SELECT 
+                       o.id,
+                       f.name,
+                       o.quantity,
+                       o.price,
+                       (o.quantity * o.price) as total_price,
+                       o.status
+                    FROM orders o
+                    JOIN food f on o.food_id = f.id
+                    WHERE o.user_id = %s
+                    ORDER BY o.id DESC
+                """, (user_id,))
+                return dbc.fetchall()
+    except:
+        return []

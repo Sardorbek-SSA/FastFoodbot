@@ -25,7 +25,7 @@ admin_menu = ReplyKeyboardMarkup(
 order_button= ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="🆕 New")],
-        [KeyboardButton(text="⏳ In Progress")],
+        [KeyboardButton(text="⏳ In progress")],
         [KeyboardButton(text="✅ Finished")],
     ],
     resize_keyboard=True,
@@ -53,12 +53,12 @@ menu_food_button = ReplyKeyboardMarkup(
 
 
 def new_order_food(order_id):
-
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="❌ Cancel",callback_data=f"new_cancel_{order_id}"),
-                InlineKeyboardButton(text="✅ In Progress",callback_data=f"new_send_{order_id}")]
+                InlineKeyboardButton(text="❌ Cancel", callback_data=f"new_cancel_{order_id}"),
+                InlineKeyboardButton(text="✅ In progress", callback_data=f"new_in_progress_{order_id}")
+            ]
         ]
     )
 
@@ -67,11 +67,10 @@ def progress_order_food(order_id):
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="❌ Cancel",callback_data=f"new_cancel_{order_id}"),
-                InlineKeyboardButton(text="🏁 Finished",callback_data=f"progress_send_{order_id}")]
+                InlineKeyboardButton(text="❌ Cancel",callback_data=f"progress_cancel_{order_id}"),
+                InlineKeyboardButton(text="🏁 Finish",callback_data=f"progress_finish_{order_id}")]
         ]
     )
-
 
 def update_food(food_id):
 

@@ -5,20 +5,21 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup,State
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton ,FSInputFile,InputMediaPhoto
 
-
-from database.query import is_register,save_user,get_foods,get_food,save_order
-from .buttons import register_kb,phone_kb,location_kb,main_button,food_button,puls_minus_button
+from database.query import is_register,save_user,get_food,save_order,get_user_orders,conn
+from .buttons import register_kb,phone_kb,location_kb,settings_button,main_button,food_button,puls_minus_button
 from .buttons import reg_text,menu_text
 from .filters import check_phone, check_location
 
 user_router = Router()
 
-
 class Register(StatesGroup):
     fullname = State()
     phone = State()
     location = State()
-
+class Settings(StatesGroup):
+    fullname = State()
+    phone = State()
+    location = State()
 
 @user_router.message(CommandStart())
 async def start(message:Message):
@@ -92,17 +93,71 @@ async def contact_admin(message:Message):
 
 Agar savollaringiz bo‘lsa yoki buyurtma bilan bog‘liq muammo yuz bersa, biz bilan bemalol bog‘lanishingiz mumkin 👇  
 
-👨‍💼 Admin: @Azamjon_Usmonaliyev 
-☎️ Telefon: +998 91 123 66 99  
+👨‍💼 Admin: @d1re_wolf
+☎️ Telefon: +998 880337333  
 ⏰ Qabul vaqti: 09:00 – 22:00  
 
 ❗ Iltimos, murojaatingizni aniq va qisqa yozing — tezroq yordam bera olamiz.
 """
     await message.answer(text)
 
+@user_router.message(F.text == "⚙️ Sozlamalar")
+async def settings_menu(message: Message):
+    await message.answer("⚙️ Sozlamalar bo‘limi. Tanlang:", reply_markup=settings_button)
 
+# Ismni o'zgartirish
+@user_router.message(F.text == "📝 Ismni o'zgartirish")
+async def change_fullname(message: Message, state: FSMContext):
+    await state.set_state(Settings.fullname)
+    await message.answer("Yangi ismni kiriting:", reply_markup=ReplyKeyboardRemove())
 
+@user_router.message(Settings.fullname)
+async def set_fullname(message: Message, state: FSMContext):
+    user = is_register(message.from_user.id)
+    if user:
+        with conn as db:
+            with db.cursor() as dbc:
+                dbc.execute("UPDATE users SET fullname = %s WHERE chat_id = %s", (message.text, message.from_user.id))
+        await state.clear()
+        await message.answer("✅ Ism muvaffaqiyatli yangilandi!", reply_markup=main_button)
 
+# Telefonni o'zgartirish
+@user_router.message(F.text == "📞 Telefon raqamini o'zgartirish")
+async def change_phone(message: Message, state: FSMContext):
+    await state.set_state(Settings.phone)
+    await message.answer("Yangi telefon raqamini kiriting:", reply_markup=phone_kb)
+
+@user_router.message(Settings.phone)
+async def set_phone(message: Message, state: FSMContext):
+    if message.contact or check_phone(message.text):
+        phone = message.contact.phone_number if message.contact else message.text
+        with conn as db:
+            with db.cursor() as dbc:
+                dbc.execute("UPDATE users SET phone = %s WHERE chat_id = %s", (phone, message.from_user.id))
+        await state.clear()
+        await message.answer("✅ Telefon raqami yangilandi!", reply_markup=main_button)
+    else:
+        await message.answer("❌ Telefon raqami noto‘g‘ri, qayta kiriting:", reply_markup=phone_kb)
+
+# Manzilni o'zgartirish
+@user_router.message(F.text == "📍 Manzilni o'zgartirish")
+async def change_location(message: Message, state: FSMContext):
+    await state.set_state(Settings.location)
+    await message.answer("Iltimos, yangi manzilingizni yuboring:", reply_markup=location_kb)
+
+@user_router.message(Settings.location)
+async def set_location(message: Message, state: FSMContext):
+    if message.location and check_location(message.location.latitude, message.location.longitude):
+        with conn as db:
+            with db.cursor() as dbc:
+                dbc.execute("UPDATE users SET lat=%s, lon=%s WHERE chat_id=%s", (message.location.latitude, message.location.longitude, message.from_user.id))
+        await state.clear()
+        await message.answer("✅ Manzil muvaffaqiyatli yangilandi!", reply_markup=main_button)
+    else:
+        await message.answer("❌ Manzil noto‘g‘ri, qayta yuboring:", reply_markup=location_kb)
+@user_router.message(F.text == "🔙 Orqaga")
+async def back_to_main(message: Message):
+    await message.answer("Asosiy menu:",reply_markup=main_button)
 
 @user_router.message(F.text =="🍽 Menu")
 async def menu(message:Message):
@@ -126,7 +181,6 @@ async def get_one_food(call:CallbackQuery):
     await call.message.edit_media(media=media)
     await call.message.edit_reply_markup(reply_markup=puls_minus_button(food[0],1))
 
-
 @user_router.callback_query(F.data.startswith("minus"))
 async def minus_button(call:CallbackQuery):
     quantity = int(call.data.split("_")[1])
@@ -137,8 +191,6 @@ async def minus_button(call:CallbackQuery):
 
     else:
         await call.answer("Mahsulot 1 ta dan kam bo'lishi mumkin emas")
-
-
 
 @user_router.callback_query(F.data.startswith("plus"))
 async def plus_button(call:CallbackQuery):
@@ -196,11 +248,35 @@ async def order_save(call:CallbackQuery):
     food_id = int(call.data.split("_")[1])
     quantity = int(call.data.split("_")[2])
     price = int(call.data.split("_")[-1])
-
     user_id =int(is_register(call.from_user.id)[0])
   
     save_order(food_id,user_id,quantity,price)
-
     await call.message.edit_reply_markup(reply_markup=None)
+    await call.message.answer(
+    "✅ Buyurtmangiz qabul qilindi!",
+    reply_markup=main_button
+)
 
-    await call.message.answer("Success",reply_markup=main_button)
+@user_router.message(F.text == "🛒 Buyurtmalar")
+async def my_orders(message: Message):
+    user = is_register(message.from_user.id)
+    if not user:
+        await message.answer("Siz hali ro‘yxatdan o‘tmagansiz!", reply_markup=register_kb)
+        return
+    
+    user_id = user[0]
+    orders = get_user_orders(user_id)
+    
+    if not orders:
+        await message.answer("❌ Sizda hali buyurtmalar yo‘q.", reply_markup=main_button)
+        return
+    text = "📦 Sizning buyurtmalaringiz:\n\n"
+    for o in orders:
+        text +=(
+            f"🍔 Taom: {o[1]}\n"
+            f"📦 Miqdor: {o[2]} ta\n"
+            f"💵 Narx: {o[3]} so‘m\n"
+            f"💵 Umumiy: {o[4]} so‘m\n"
+            f"📌 Status: {o[5]}\n\n"
+        )
+    await message.answer(text, reply_markup=main_button)
