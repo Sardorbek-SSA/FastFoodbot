@@ -6,7 +6,7 @@ from aiogram.fsm.state import StatesGroup,State
 
 from database import (is_admin,is_new_foods,
                       is_progress_foods,update_order,
-                      add_food,get_foods)
+                      add_food,get_foods,update_food_name)
 
 from .buttons import register_kb
 from .admin_button import (admin_munu_text,admin_menu,
@@ -17,6 +17,12 @@ from .admin_button import (admin_munu_text,admin_menu,
 
 admin_router = Router()
 
+class EditFood(StatesGroup):
+    name = State()
+    price = State()
+    desc = State()
+    quantity = State()
+    image = State()
 
 @admin_router.message(Command("admin"))
 async def start_admin(message: Message):
@@ -68,24 +74,17 @@ async def progress_order(message:Message):
                      reply_markup=progress_order_food(i[0])
             )
 
-@admin_router.callback_query(F.data.startswith("progress_finish"))
-async def progress_finish(call: CallbackQuery):
-    order_id = int(call.data.split("_")[-1])
-    update_order(order_id, "finished")
-    await call.message.edit_reply_markup(reply_markup=None)
-    await call.message.edit_text("Buyurtma yakunlandi ✅")
-
 @admin_router.callback_query(F.data.startswith("progress_cancel"))
 async def progress_cancel(call: CallbackQuery):
     order_id = int(call.data.split("_")[-1])
     update_order(order_id, "cancel")
     await call.message.edit_reply_markup(reply_markup=None)
-    await call.message.edit_text("Buyurtma bekor qilindi ✅")
+    await call.message.edit_text("Buyurtma bekor qilindi ❌")
 
 @admin_router.callback_query(F.data.startswith("new_cancel"))
 async def cancel_order(call:CallbackQuery):
     order_id = int(call.data.split("_")[-1])
-    update_order(order_id)
+    update_order(order_id,"cancel")
   
     await call.message.edit_reply_markup(reply_markup=None)
     await call.message.edit_text(text="Cancelled")
@@ -93,17 +92,37 @@ async def cancel_order(call:CallbackQuery):
 @admin_router.callback_query(F.data.startswith("new_in_progress_"))
 async def in_progress_order(call: CallbackQuery):
     order_id = int(call.data.split("_")[-1])
-    try:
-        update_order(order_id, status='In progress') 
-        await call.message.edit_reply_markup(reply_markup=None)
-        await call.message.edit_text("⌛ In progress")
-    except Exception as e:
-        await call.message.answer(f"Xatolik yuz berdi: {e}")
+    if update_order(order_id, "in_progress"):  
+        await call.message.edit_reply_markup(reply_markup=progress_order_food(order_id))
+        await call.message.edit_text("⌛ Buyurtma in_progress holatiga o‘tkazildi")
+    else:
+        await call.message.answer("❌ Xatolik: buyurtma yangilanmadi")
+
+@admin_router.callback_query(F.data.startswith("progress_finish_"))
+async def finish_order_handler(call: CallbackQuery):
+    order_id = int(call.data.split("_")[-1])
+    
+    update_order(order_id, "finished")  
+    
+    await call.answer("✅ Buyurtma tugallandi!", show_alert=True)
+    await call.message.edit_reply_markup(reply_markup=None)
+    await call.message.answer(f"🏁 Buyurtma ID: {order_id} muvaffaqiyatli tugallandi ✅")
 
 @admin_router.message(F.text=="🍱 Taomlar")
 async def menu_foods(message:Message,state:FSMContext):
     await state.clear() 
     await message.answer(text=menu_for_food,reply_markup=menu_food_button)
+
+@admin_router.message(EditFood.name)
+async def save_new_name(message: Message, state:FSMContext):
+    data = await state.get_data()
+    food_id = data["food_id"]
+    new_name = message.text
+
+    update_food_name(food_id, new_name)   
+
+    await message.answer("✅ Nomi yangilandi!")
+    await state.clear()
 
 
 class CreateFood(StatesGroup):
@@ -199,3 +218,49 @@ async def  update_food_start(message:Message):
     
     for i in get_foods():
         await message.answer(text=str(i[1]),reply_markup=update_food(i[0]))
+        
+@admin_router.callback_query(F.data.startswith("edit_name_"))
+async def edit_name_handler(call: CallbackQuery, state: FSMContext):
+    food_id = int(call.data.split("_")[-1])
+    await state.update_data(food_id=food_id)
+    await state.set_state(EditFood.name)
+    await call.message.answer("✏️ Yangi taom nomini kiriting:")
+    
+@admin_router.callback_query(F.data.startswith("edit_price_"))
+async def edit_price_handler(call: CallbackQuery, state: FSMContext):
+    food_id = int(call.data.split("_")[-1])
+    await state.update_data(food_id=food_id)
+    await state.set_state(EditFood.price)
+    await call.message.answer("💵 Yangi narxni kiriting:")
+
+
+@admin_router.callback_query(F.data.startswith("edit_desc_"))
+async def edit_desc_handler(call: CallbackQuery, state: FSMContext):
+    food_id = int(call.data.split("_")[-1])
+    await state.update_data(food_id=food_id)
+    await state.set_state(EditFood.desc)
+    await call.message.answer("📄 Yangi tavsifni kiriting:")
+    
+@admin_router.callback_query(F.data.startswith("edit_quantity_"))
+async def edit_quantity_handler(call: CallbackQuery, state: FSMContext):
+    food_id = int(call.data.split("_")[-1])
+    await state.update_data(food_id=food_id)
+    await state.set_state(EditFood.quantity)
+    await call.message.answer("🛒 Yangi miqdorni kiriting:")
+
+
+@admin_router.callback_query(F.data.startswith("edit_image_"))
+async def edit_image_handler(call: CallbackQuery, state: FSMContext):
+    food_id = int(call.data.split("_")[-1])
+    await state.update_data(food_id=food_id)
+    await state.set_state(EditFood.image)
+    await call.message.answer("📷 Yangi rasmni yuboring:")
+    
+@admin_router.message(EditFood.name)
+async def save_new_name(message: Message, state:FSMContext):
+    data = await state.get_data()
+    food_id = data["food_id"]
+    new_name = message.text
+    update_order(food_id, new_name)
+    await message.answer("✅ Nomi yangilnadi!")
+    await state.clear()

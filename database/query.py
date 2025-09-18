@@ -1,6 +1,6 @@
 from .connect import get_connect
 from config import ADMINS
-
+import psycopg2
 conn = get_connect()
 conn.autocommit = True
 
@@ -110,7 +110,7 @@ WHERE o.status = 'in_progress';
     except:
         return None
 
-def update_order(order_id, status='Cancelled'):
+def update_order(order_id, status='Cancel'):
     try:
         with conn as db:
             with db.cursor() as dbc:
@@ -119,20 +119,30 @@ def update_order(order_id, status='Cancelled'):
                     (status, order_id)
                 )
         return True
-    except:
-        return None
+    except Exception as e:
+        print("DB ERROR in update_order:", e)
+        return False
     
 
-def add_food(data:dict):
+def add_food(data: dict):
     try:
         with conn as db:
             with db.cursor() as dbc:
-                dbc.execute("insert into food (name,description,image,price,quantity) values(%s,%s,%s,%s,%s)",(data["name"],data["desc"],data["image"],data["price"],data["quantity"]))
-                
+                query = """
+                    INSERT INTO food (name, description, image, price, quantity)
+                    VALUES (%s, %s, %s, %s, %s)
+                """
+                dbc.execute(query, (
+                    data.get("name"),
+                    data.get("desc") or data.get("description"), 
+                    data.get("image"),
+                    data.get("price"),
+                    data.get("quantity")
+                ))
         return True
-
-    except:
-        return None
+    except Exception as e:
+        print("DB ERROR in add_food:", e) 
+        return False
     
 def get_user_orders(user_id):
     try:
@@ -149,8 +159,16 @@ def get_user_orders(user_id):
                     FROM orders o
                     JOIN food f on o.food_id = f.id
                     WHERE o.user_id = %s
+                    AND DATE(o.created_at) = CURRENT_DATE
                     ORDER BY o.id DESC
                 """, (user_id,))
                 return dbc.fetchall()
     except:
         return []
+
+def update_food_name(food_id, new_name):
+    with conn as db:
+        with db.cursor() as cur:
+            cur.execute("UPDATE food SET name = %s WHERE id = %s", (new_name, food_id))
+    return True
+    

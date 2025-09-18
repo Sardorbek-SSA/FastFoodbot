@@ -94,11 +94,7 @@ async def contact_admin(message:Message):
 Agar savollaringiz bo‘lsa yoki buyurtma bilan bog‘liq muammo yuz bersa, biz bilan bemalol bog‘lanishingiz mumkin 👇  
 
 👨‍💼 Admin: @d1re_wolf
-<<<<<<< HEAD
 ☎️ Telefon: +998 880337333  
-=======
-☎️ Telefon: +998 88 033 73 33
->>>>>>> 328af28d16ff8b0545c91ccf1345b1cb90bcbacc
 ⏰ Qabul vaqti: 09:00 – 22:00  
 
 ❗ Iltimos, murojaatingizni aniq va qisqa yozing — tezroq yordam bera olamiz.
@@ -261,31 +257,28 @@ async def order_save(call:CallbackQuery):
     reply_markup=main_button
 )
 
-<<<<<<< HEAD
 @user_router.message(F.text == "🛒 Buyurtmalar")
 async def my_orders(message: Message):
     user = is_register(message.from_user.id)
     if not user:
-        await message.answer("Siz hali ro‘yxatdan o‘tmagansiz!", reply_markup=register_kb)
+        await message.answer("❗ Siz ro‘yxatdan o‘tmagansiz!", reply_markup=register_kb)
         return
-    
-    user_id = user[0]
+
+    user_id = user[0]  
     orders = get_user_orders(user_id)
-    
+
     if not orders:
-        await message.answer("❌ Sizda hali buyurtmalar yo‘q.", reply_markup=main_button)
+        await message.answer("📭 Bugun hech qanday buyurtma qilmagansiz.", reply_markup=main_button)
         return
-    text = "📦 Sizning buyurtmalaringiz:\n\n"
+
+    text = "📦 Bugungi buyurtmalaringiz:\n\n"
     for o in orders:
-        text +=(
-            f"🍔 Taom: {o[1]}\n"
+        text += (
+            f"🍔 {o[1]}\n"
             f"📦 Miqdor: {o[2]} ta\n"
             f"💵 Narx: {o[3]} so‘m\n"
             f"💵 Umumiy: {o[4]} so‘m\n"
             f"📌 Status: {o[5]}\n\n"
         )
-    await message.answer(text, reply_markup=main_button)
-=======
-    await call.message.answer("Success",reply_markup=main_button)
 
->>>>>>> 328af28d16ff8b0545c91ccf1345b1cb90bcbacc
+    await message.answer(text, reply_markup=main_button)
